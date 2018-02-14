@@ -111,7 +111,7 @@ def gaussian_blur_kernel_2d(sigma, width, height):
             temp = (1.0/(2*math.pi*(sigma**2)))*np.exp(-(x**2+y**2)/(2.0*(sigma**2)))
             gaussian[u, v] = temp
             regulated += temp
-    return gaussian.Tc/regulated
+    return gaussian.T/regulated
     #raise Exception("TODO in hybrid.py not implemented")
     # TODO-BLOCK-END
 
