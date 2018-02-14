@@ -3,6 +3,7 @@ sys.path.append('/Users/kb/bin/opencv-3.1.0/build/lib/')
 
 import cv2
 import numpy as np
+import math
 
 def cross_correlation_2d(img, kernel):
     '''Given a kernel of arbitrary m x n dimensions, with both m and n being
@@ -23,42 +24,42 @@ def cross_correlation_2d(img, kernel):
         height and the number of color channels)
     '''
     # TODO-BLOCK-BEGIN
-    k_width = (len(kernel[0])-1)/2
-    k_height = (len(kernel)-1)/2
+
+    kernel_height, kernel_width = kernel.shape
+    k_height = int(kernel_height /2)
+    k_width = int(kernel_width /2)
 
     if len(img.shape) == 3:
-        color = len(img[0][0])
-        mod_img = []
+        img_height, img_width, _ = img.shape
+        mod_img = np.zeros((img_height, img_width, 3))
 
-        for channel in range(color):
+        img = np.pad(img,((k_height, k_height), (k_width, k_width), (0,0)), "constant", constant_values = 0)
+
+
+        for channel in range(3):
             #GET IMG SHAPE (x,y) value
-            mod_channel = np.zeros((len(img), len(img[0])))
+            #mod_channel = np.zeros((img_height, img_width))
+            #temp = np.zeros((img_height+k_height*2, img_width+k_width*2))
+            #temp[k_height: img_height+k_height, k_width: img_width+k_width] = img[:,:,channel]
+            for i in range(img_height):
+                for j in range(img_width):
+                    t = img[i:i+kernel_height, j:j+kernel_width, channel]
 
-            for i in range(len(mod_channel)):
-                for j in range(len(mod_channel[0])):
-                    mod_channel[i][j] = 0
-                    for u in range(-k_width, k_width+1):
-                        for v in range(-k_height, k_height+1):
-                            if i+u < 0 or j+v < 0:
-                                mod_channel[i][j] += 0
-                            else:
-                                mod_channel[i][j] += kernel[u][v]*img[i+u][j+v][channel]
-                            #mod_channel[i][j] = sum([kernel[u][v]*img[i+u][j+v][channel] for u in range(len(kernel)) for v in range(len(kernel[0]))])
+                    mod_img[i][j][channel] = (kernel*t).sum()
 
-            mod_img.append(mod_channel)
+            #mod_img.append(mod_channel)
 
     else:
-        mod_img = np.zeros((len(img), len(img[0])))
+        img_height, img_width = img.shape
+        mod_img = np.zeros((img_height, img_width))
 
-        for i in range(len(mod_img)):
-            for j in range(len(mod_img[0])):
-                mod_img[i][j] = 0
-                for u in range(-k_width, k_width+1):
-                    for v in range(-k_height, k_height+1):
-                        if i+u < 0 or j+v < 0:
-                            mod_img[i][j] += 0
-                        else:
-                            mod_img[i][j] += kernel[u][v]*img[i+u][j+v]
+        img = np.pad(img,((k_height, k_height), (k_width, k_width)), "constant", constant_values = 0)
+
+        for i in range(img_height):
+            for j in range(img_width):
+                t = img[i:i+kernel_height, j:j+kernel_width]
+                mod_img[i][j] = (kernel*t).sum()
+
     return mod_img
     #raise Exception("TODO in hybrid.py not implemented")
     # TODO-BLOCK-END
@@ -78,8 +79,10 @@ def convolve_2d(img, kernel):
     '''
     # TODO-BLOCK-BEGIN
     #print "yes", img.size
-    flipped_kernel = np.fliplr(np.flipud(kernel))
-    return cross_correlation_2d(img, flipped_kernel)
+    #flipped_kernel = np.fliplr(np.flipud(kernel))
+
+    result = cross_correlation_2d(img, np.fliplr(np.flipud(kernel)))
+    return result
     #raise Exception("TODO in hybrid.py not implemented")
     # TODO-BLOCK-END
 
@@ -99,11 +102,16 @@ def gaussian_blur_kernel_2d(sigma, width, height):
         with an image results in a Gaussian-blurred image.
     '''
     # TODO-BLOCK-BEGIN
-    gaussian = np.zeros((width, height))
-    for u in range(width):
-        for v in range(height):
-            gaussian[u][v] = (1/(2*np.pi*(sigma**2)))*np.exp(-(u**2+v**2)/(2*(sigma**2)))
-    return gaussian
+    gaussian = np.zeros((height, width))
+    regulated = 0
+    for u in range(height):
+        for v in range(width):
+            x=v-width/2
+            y=u-height/2
+            temp = (1.0/(2*math.pi*(sigma**2)))*np.exp(-(x**2+y**2)/(2.0*(sigma**2)))
+            gaussian[u, v] = temp
+            regulated += temp
+    return gaussian.Tc/regulated
     #raise Exception("TODO in hybrid.py not implemented")
     # TODO-BLOCK-END
 
@@ -119,7 +127,7 @@ def low_pass(img, sigma, size):
     # TODO-BLOCK-BEGIN
     gaussian = gaussian_blur_kernel_2d(sigma, size, size)
     blurred_img = convolve_2d (img, gaussian)
-    return img + blurred_img
+    return blurred_img
     #raise Exception("TODO in hybrid.py not implemented")
     # TODO-BLOCK-END
 
@@ -134,9 +142,9 @@ def high_pass(img, sigma, size):
     '''
     # TODO-BLOCK-BEGIN
     #raise Exception("TODO in hybrid.py not implemented")
-    gaussian = gaussian_blur_kernel_2d(sigma, size, size)
-    blurred_img = convolve_2d (img, gaussian)
-    return img - blurred_img
+    # gaussian = gaussian_blur_kernel_2d(sigma, size, size)
+    # blurred_img = convolve_2d (img, gaussian)
+    return img - low_pass(img, sigma, size)
     # TODO-BLOCK-END
 
 def create_hybrid_image(img1, img2, sigma1, size1, high_low1, sigma2, size2,
